@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Germany Solar | Panel Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        body { background-color: #0f172a; font-family: sans-serif; color: #f1f5f9; }
+        .admin-header { background: #111111; border-bottom: 4px solid #facc15; }
+        .card-dark { background: #1e293b; border: 1px solid #334155; border-radius: 12px; }
+        .tab-btn { padding: 10px 20px; font-weight: bold; border-radius: 20px; cursor: pointer; transition: 0.3s; background: #334155; color: #f1f5f9; }
+        .tab-btn.active { background: #facc15; color: #111111; box-shadow: 0 0 10px rgba(250,204,21,0.4); }
+        .section-panel { display: none; }
+        .section-panel.active { display: block; }
+    </style>
+</head>
+<body class="pb-10">
+
+    <!-- Header Administrateur -->
+    <div class="admin-header p-6 shadow-xl flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-black tracking-wide text-white uppercase">GERMANY ADMIN</h1>
+            <p class="text-xs text-[#facc15] font-bold uppercase tracking-widest mt-1">Supervision de l'infrastructure</p>
+        </div>
+        <div class="bg-slate-900 px-4 py-2 rounded-full border border-amber-400 text-xs font-bold text-amber-400">
+            <i class="fas fa-shield-alt mr-1"></i> Console Racine
+        </div>
+    </div>
+
+    <!-- Navigation par onglets -->
+    <div class="flex gap-3 justify-center my-6 px-4 flex-wrap">
+        <button class="tab-btn active" onclick="switchTab('tab-recharges', this)"><i class="fas fa-arrow-down mr-2 text-green-400"></i>Dépôts</button>
+        <button class="tab-btn" onclick="switchTab('tab-withdrawals', this)"><i class="fas fa-arrow-up mr-2 text-amber-400"></i>Retraits</button>
+        <button class="tab-btn" onclick="switchTab('tab-users', this)"><i class="fas fa-users mr-2 text-blue-400"></i>Membres</button>
+    </div>
+
+    <div class="max-w-4xl mx-auto px-4">
+
+        <!-- ONGLET : DÉPÔTS -->
+        <div id="tab-recharges" class="section-panel active">
+            <h2 class="text-lg font-black uppercase tracking-wider text-[#facc15] mb-4"><i class="fas fa-circle text-xs mr-2 text-green-500"></i>Demandes de recharges</h2>
+            <div id="recharges-list" class="space-y-4">
+                <p class="text-gray-400 text-sm">Chargement des transactions...</p>
+            </div>
+        </div>
+
+        <!-- ONGLET : RETRAITS -->
+        <div id="tab-withdrawals" class="section-panel">
+            <h2 class="text-lg font-black uppercase tracking-wider text-[#facc15] mb-4"><i class="fas fa-circle text-xs mr-2 text-amber-500"></i>Demandes de retraits</h2>
+            <div id="withdrawals-list" class="space-y-4">
+                <p class="text-gray-400 text-sm">Chargement des transactions...</p>
+            </div>
+        </div>
+
+        <!-- ONGLET : MEMBRES -->
+        <div id="tab-users" class="section-panel">
+            <h2 class="text-lg font-black uppercase tracking-wider text-[#facc15] mb-4"><i class="fas fa-users mr-2"></i>Utilisateurs &amp; Plans Énergétiques</h2>
+            <div class="card-dark overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-800 text-xs font-bold uppercase tracking-wider text-gray-400 border-b border-slate-700">
+                                <th class="p-4">Téléphone</th>
+                                <th class="p-4">Solde</th>
+                                <th class="p-4">Statut Retrait</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body" class="text-sm divide-y divide-slate-700">
+                            <!-- Injection dynamique des membres -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // CONFIGURATION FIREBASE
+        const firebaseConfig = { databaseURL: "https://firstsolar-e2ba3-default-rtdb.firebaseio.com/" };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Gestion de l'affichage des onglets
+        function switchTab(panelId, btn) {
+            document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        // --- 1. CONFIGURATION DU FLUX DES DÉPÔTS ---
+        db.ref('admin/recharges').on('value', (snapshot) => {
+            const container = document.getElementById('recharges-list');
+            container.innerHTML = '';
+            
+            if (!snapshot.exists()) {
+                container.innerHTML = '<p class="text-gray-500 text-sm bg-slate-900 p-4 rounded-lg text-center">Aucune recharge enregistrée.</p>';
+                return;
+            }
+
+            snapshot.forEach((child) => {
+                const key = child.key;
+                const data = child.val();
+
+                if (data.status === "En attente") {
+                    container.innerHTML += `
+                    <div class="card-dark p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="bg-green-950 text-green-400 font-bold text-[10px] px-2 py-0.5 rounded uppercase tracking-wider">${data.reseau}</span>
+                                <span class="text-slate-400 text-xs">${new Date(data.date).toLocaleString('fr-FR')}</span>
+                            </div>
+                            <p class="text-xl font-black text-white">${parseFloat(data.montant || 0).toLocaleString('fr-FR', {minimumFractionDigits: 2})} FC</p>
+                            <p class="text-xs text-gray-300 mt-1">Émetteur : <strong class="text-[#facc15]">${data.expediteur}</strong></p>
+                            <p class="text-[11px] text-gray-400 font-mono mt-1">Réf Trans : ${data.transaction_id}</p>
+                        </div>
+                        <div class="flex gap-2 w-full md:w-auto">
+                            <button onclick="approveRecharge('${key}', '${data.userId}', ${data.montant})" class="bg-green-600 hover:bg-green-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg flex-1 md:flex-none uppercase tracking-wider"><i class="fas fa-check mr-1"></i> Approuver</button>
+                            <button onclick="rejectAction('admin/recharges/${key}')" class="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg flex-1 md:flex-none uppercase tracking-wider"><i class="fas fa-times mr-1"></i> Rejeter</button>
+                        </div>
+                    </div>`;
+                }
+            });
+
+            if(container.innerHTML === '') {
+                container.innerHTML = '<p class="text-gray-500 text-sm bg-slate-900 p-4 rounded-lg text-center">Aucune demande de dépôt en attente.</p>';
+            }
+        });
+
+        async function approveRecharge(key, clientUid, amount) {
+            try {
+                const userRef = db.ref('users/' + clientUid);
+                const snap = await userRef.once('value');
+                if(snap.exists()){
+                    const currentBalance = parseFloat(snap.val().balance || 0);
+                    await userRef.update({ balance: currentBalance + parseFloat(amount) });
+                    await db.ref('admin/recharges/' + key).update({ status: "Complété" });
+                    alert("Dépôt validé ! Le portefeuille de l'utilisateur a été crédité.");
+                }
+            } catch (e) {
+                alert("Erreur technique lors de l'approbation.");
+            }
+        }
+
+        // --- 2. CONFIGURATION DU FLUX DES RETRAITS ---
+        db.ref('admin/withdrawals').on('value', (snapshot) => {
+            const container = document.getElementById('withdrawals-list');
+            container.innerHTML = '';
+
+            if (!snapshot.exists()) {
+                container.innerHTML = '<p class="text-gray-500 text-sm bg-slate-900 p-4 rounded-lg text-center">Aucun retrait enregistré dans le système.</p>';
+                return;
+            }
+
+            snapshot.forEach((child) => {
+                const key = child.key;
+                const data = child.val();
+
+                if (data.status === "En attente") {
+                    const infoBancaire = data.bankInfo;
+                    container.innerHTML += `
+                    <div class="card-dark p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-l-4 border-amber-500">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="bg-amber-950 text-amber-400 font-bold text-[10px] px-2 py-0.5 rounded uppercase tracking-wider">${infoBancaire.banque || 'Mobile Money'}</span>
+                                <span class="text-slate-400 text-xs">${new Date(data.date).toLocaleString('fr-FR')}</span>
+                            </div>
+                            <p class="text-xl font-black text-white">${parseFloat(data.amount || 0).toLocaleString('fr-FR', {minimumFractionDigits: 2})} FC</p>
+                            <p class="text-xs text-amber-400 mt-1 font-bold">Frais système déduits (15%) : ${parseFloat(data.fees || 0).toLocaleString('fr-FR', {minimumFractionDigits: 2})} FC</p>
+                            <p class="text-sm text-green-400 font-black mt-1">VALEUR NETTE À TRANSFÉRER : ${parseFloat(data.netAmount || 0).toLocaleString('fr-FR', {minimumFractionDigits: 2})} FC</p>
+                            
+                            <div class="bg-slate-900 p-3 rounded mt-3 text-xs text-gray-300 border border-slate-700">
+                                <p><strong>Ligne de destination :</strong> <span class="text-[#facc15] font-mono font-bold text-sm bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">${infoBancaire.numero || 'Non configuré'}</span></p>
+                                <p class="mt-1.5"><strong>Bénéficiaire désigné :</strong> ${infoBancaire.titulaire || 'Non configuré'}</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 w-full md:w-auto self-end md:self-center">
+                            <button onclick="approveWithdrawal('${key}')" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs px-4 py-3 rounded-lg flex-1 md:flex-none uppercase tracking-wider"><i class="fas fa-check mr-1"></i> Confirmer l'envoi</button>
+                        </div>
+                    </div>`;
+                }
+            });
+
+            if(container.innerHTML === '') {
+                container.innerHTML = '<p class="text-gray-500 text-sm bg-slate-900 p-4 rounded-lg text-center">Aucun dossier de retrait en attente.</p>';
+            }
+        });
+
+        async function approveWithdrawal(key) {
+            if(confirm("Confirmez-vous que les fonds correspondants ont bien été acheminés vers le numéro Mobile Money du destinataire ?")) {
+                await db.ref('admin/withdrawals/' + key).update({ status: "Complété" });
+                alert("Retrait archivé sous le statut : Complété.");
+            }
+        }
+
+        async function rejectAction(dbPath) {
+            if(confirm("Voulez-vous rejeter et invalider définitivement cette transaction ?")) {
+                await db.ref(dbPath).update({ status: "Refusé" });
+                alert("La demande a été rejetée.");
+            }
+        }
+
+        // --- 3. SYNCHRONISATION EN TEMPS RÉEL DES COMPTES UTISATEURS ---
+        db.ref('users').on('value', (snapshot) => {
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '';
+
+            if (snapshot.exists()) {
+                snapshot.forEach((child) => {
+                    const uData = child.val();
+                    const statusRetrait = uData.canWithdraw ? 
+                        '<span class="text-green-400 font-bold bg-green-950/80 border border-green-800 px-2 py-0.5 rounded text-xs">Actif</span>' : 
+                        '<span class="text-gray-400 font-bold bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-xs">Aucun plan</span>';
+
+                    tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/50 transition">
+                        <td class="p-4 font-mono font-bold text-[#facc15]">${uData.phone || 'Inconnu'}</td>
+                        <td class="p-4 font-black text-white">${parseFloat(uData.balance || 0).toLocaleString('fr-FR', {minimumFractionDigits: 2})} FC</td>
+                        <td class="p-4">${statusRetrait}</td>
+                    </tr>`;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">Aucun enregistrement trouvé.</td></tr>';
+            }
+        });
+    </script>
+</body>
+</html>
